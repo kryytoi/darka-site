@@ -64,9 +64,15 @@ export async function POST(req) {
       content: i === hist.length - 1 ? m.content : compactAttachments(m.content),
     }));
 
+    // Главный промпт пользователя: инструкция о том, как Darka должна писать
+    const [settings] = await sql`SELECT system_prompt FROM user_settings WHERE user_id = ${user.id} LIMIT 1`;
+    const modelMessages = settings?.system_prompt
+      ? [{ role: 'system', content: settings.system_prompt }, ...messages]
+      : messages;
+
     let answer;
     try {
-      answer = await askModel(model.id, messages);
+      answer = await askModel(model.id, modelMessages);
     } catch (e) {
       await sql`UPDATE chats SET updated_at = NOW() WHERE id = ${chatId}`;
       const status = e instanceof ModelError ? e.status : 502;

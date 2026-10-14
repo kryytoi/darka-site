@@ -5,8 +5,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Brand from '@/components/Brand';
 import Markdown from '@/components/Markdown';
 import GithubImport from '@/components/GithubImport';
+import CustomizeModal from '@/components/CustomizeModal';
 import { MODELS, getModel, canUseModel } from '@/lib/models';
 import { buildMessage, splitMessage, readTextFile, validateAttachments } from '@/lib/attachments';
+import { DEFAULT_THEME, themeVars } from '@/lib/theme';
 
 const SUGGESTIONS = [
   'Объясни простыми словами, что такое нейросеть',
@@ -77,6 +79,10 @@ export default function ChatApp({ user: initialUser }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [theme, setTheme] = useState(DEFAULT_THEME);
+  const [savedTheme, setSavedTheme] = useState(DEFAULT_THEME);
+  const [savedPrompt, setSavedPrompt] = useState('');
   const [sideOpen, setSideOpen] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
   const [copied, setCopied] = useState(null);
@@ -105,6 +111,21 @@ export default function ChatApp({ user: initialUser }) {
   useEffect(() => {
     loadChats();
   }, [loadChats]);
+
+  // Тема и главный промпт пользователя
+  useEffect(() => {
+    fetch('/api/settings', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setTheme(data.theme);
+        setSavedTheme(data.theme);
+        setSavedPrompt(data.systemPrompt || '');
+      })
+      .catch(() => {
+        /* настройки не критичны, останется тема по умолчанию */
+      });
+  }, []);
 
   // Выбираем доступную модель по умолчанию (для Pro — самую сильную)
   useEffect(() => {
@@ -285,7 +306,7 @@ export default function ChatApp({ user: initialUser }) {
   const canSend = !sending && (input.trim() !== '' || attachments.length > 0);
 
   return (
-    <div className="chat-shell">
+    <div className="chat-shell" style={themeVars(theme)}>
       <div className={sideOpen ? 'scrim open' : 'scrim'} onClick={() => setSideOpen(false)} />
       <aside className={sideOpen ? 'sidebar open' : 'sidebar'} aria-label="Разговоры">
         <Brand />
@@ -308,6 +329,13 @@ export default function ChatApp({ user: initialUser }) {
             </div>
           ))}
         </nav>
+        <button type="button" className="side-custom" onClick={() => setCustomizeOpen(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+          </svg>
+          Кастомизация
+        </button>
         <div className="user-box">
           <div className="user-line">
             <span className="user-name">{user.username}</span>
@@ -534,6 +562,25 @@ export default function ChatApp({ user: initialUser }) {
 
       {importOpen && (
         <GithubImport onClose={() => setImportOpen(false)} onImport={onImported} />
+      )}
+
+      {customizeOpen && (
+        <CustomizeModal
+          savedTheme={savedTheme}
+          savedPrompt={savedPrompt}
+          onPreview={setTheme}
+          onSaved={(data) => {
+            setSavedTheme(data.theme);
+            setSavedPrompt(data.systemPrompt);
+            setTheme(data.theme);
+            setCustomizeOpen(false);
+          }}
+          onClose={() => {
+            // Закрытие без сохранения откатывает предпросмотр темы
+            setTheme(savedTheme);
+            setCustomizeOpen(false);
+          }}
+        />
       )}
     </div>
   );
