@@ -1,0 +1,354 @@
+/* Новый вид чата.
+   Смешаны три подхода: точечное свечение из Gemini, ровные ряды сообщений из ChatGPT
+   и тёплая серифная типографика из Claude. Цвета остаются фирменными для Darka. */
+
+@property --glow-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --g-violet: #8b5cf6;
+  --g-blue: #3b82f6;
+  --g-pink: #ec4899;
+  --g-cyan: #22d3ee;
+  --surface3: #241a40;
+}
+
+@keyframes glow-spin {
+  to { --glow-angle: 360deg; }
+}
+
+/* Точечное свечение: цветные точки по сетке, которые плавно переливаются и гаснут к краям */
+.dot-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: conic-gradient(from var(--glow-angle), var(--g-violet), var(--g-blue), var(--g-pink), var(--g-cyan), var(--g-violet));
+  -webkit-mask-image: radial-gradient(circle, #000 1.3px, transparent 1.9px), radial-gradient(ellipse at center, #000 25%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 1.3px, transparent 1.9px), radial-gradient(ellipse at center, #000 25%, transparent 70%);
+  -webkit-mask-size: 10px 10px, 100% 100%;
+  mask-size: 10px 10px, 100% 100%;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  opacity: 0.45;
+  transition: opacity 0.6s ease;
+  animation: glow-spin 10s linear infinite;
+}
+
+/* Фон разговора: мягкое фиолетовое сияние сверху */
+.messages {
+  background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(124, 58, 237, 0.09), transparent 70%);
+}
+
+/* Пустой экран */
+.empty-chat {
+  position: relative;
+  isolation: isolate;
+  padding: 40px 0;
+}
+.empty-chat > *:not(.empty-glow) {
+  position: relative;
+  z-index: 1;
+}
+.empty-glow {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: min(640px, 150vw);
+  height: 360px;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  pointer-events: none;
+}
+.empty-glow .dot-glow {
+  opacity: 0.6;
+  -webkit-mask-size: 12px 12px, 100% 100%;
+  mask-size: 12px 12px, 100% 100%;
+}
+.empty-chat h2 {
+  background: linear-gradient(95deg, #f5f3ff 0%, #c4b5fd 40%, #93c5fd 75%, #f0abfc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.suggest button {
+  background: rgba(21, 14, 38, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: border-color 0.2s, color 0.2s, transform 0.2s;
+}
+.suggest button:hover { transform: translateY(-1px); }
+
+/* Боковая панель */
+.sidebar {
+  background: linear-gradient(180deg, #161028, #0f0a1d);
+  border-right-color: rgba(67, 50, 107, 0.5);
+}
+.new-chat-btn {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
+}
+.new-chat-btn:hover { background: linear-gradient(135deg, #9d6ff8, #7c3aed); }
+.chat-item { transition: background 0.15s; }
+
+/* Верхняя панель */
+.topbar {
+  background: rgba(10, 6, 18, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom-color: rgba(67, 50, 107, 0.55);
+}
+.model-btn { background: rgba(21, 14, 38, 0.8); }
+
+/* Сообщения: пользователь — мягкая капсула, Darka — чистый текст без пузыря */
+.msg-user {
+  background: linear-gradient(180deg, #241a40, #1d1433);
+  border: 1px solid rgba(167, 139, 250, 0.16);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.msg-text { color: #e7e1f7; }
+.msg-bot .av {
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+}
+.msg-bot .who { letter-spacing: 0.02em; }
+.typing i { box-shadow: 0 0 8px var(--purple); }
+
+/* Поле ввода с точечным свечением */
+.composer {
+  position: relative;
+}
+.composer-inner {
+  position: relative;
+}
+.composer-glow {
+  inset: -36px -26px -14px;
+  opacity: 0.35;
+}
+.composer-inner:focus-within .composer-glow,
+.chat-main.is-sending .composer-glow {
+  opacity: 1;
+}
+.composer-box {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, var(--surface3), var(--surface));
+  border: 1px solid var(--line2);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.composer-box:focus-within {
+  border-color: rgba(167, 139, 250, 0.6);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.14), 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.composer-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding-left: 4px;
+}
+.composer-box textarea {
+  padding: 10px 6px;
+}
+
+/* Кнопка «+» и меню */
+.plus-wrap {
+  position: relative;
+  flex: none;
+  align-self: flex-end;
+}
+.plus-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.plus-btn:hover { border-color: var(--purple); }
+.plus-btn[aria-expanded='true'] {
+  transform: rotate(45deg);
+  border-color: var(--purple);
+}
+.plus-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  z-index: 25;
+}
+.plus-menu button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+}
+.plus-menu button:hover {
+  background: var(--surface3);
+  color: var(--purple-soft);
+}
+
+/* Чипы файлов */
+.attach-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 4px 2px;
+}
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+  min-height: 32px;
+  padding: 0 6px 0 10px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--line2);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.file-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-chip svg { flex: none; color: var(--purple-soft); }
+.file-x {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+}
+.file-x:hover {
+  color: var(--err);
+  background: var(--surface3);
+}
+.msg-files {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.msg-user .file-chip { max-width: 100%; }
+
+.send-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.4);
+}
+.send-btn:hover { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+.banner.notice { color: var(--purple-soft); }
+
+/* Окно импорта из GitHub */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 2, 12, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.modal {
+  width: 100%;
+  max-width: 520px;
+  padding: 26px;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.modal-head h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+}
+.modal-hint {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.modal-hint code {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--purple-soft);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+}
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+@media (max-width: 860px) {
+  .composer-glow { inset: -24px -10px -8px; }
+  .empty-glow { height: 280px; }
+  .plus-menu { min-width: 230px; }
+}

@@ -1,4 +1,5 @@
 import './globals.css';
+import './chat-theme.css';
 
 export const metadata = {
   title: 'Darka — нейросеть, с которой можно думать вслух',

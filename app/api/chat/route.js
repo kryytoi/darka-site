@@ -2,11 +2,11 @@ import { db } from '@/lib/db';
 import { requireUser, json, effectivePlan } from '@/lib/auth';
 import { getModel, canUseModel } from '@/lib/models';
 import { askModel, ModelError } from '@/lib/backends';
+import { MAX_MESSAGE_CHARS, splitMessage, compactAttachments } from '@/lib/attachments';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const MAX_LEN = 8000;
 const HISTORY = 20;
 
 export async function POST(req) {
@@ -23,7 +23,9 @@ export async function POST(req) {
 
   const text = String(body.message || '').trim();
   if (!text) return json({ error: 'Введите сообщение' }, 400);
-  if (text.length > MAX_LEN) return json({ error: `Сообщение длиннее ${MAX_LEN} символов` }, 400);
+  if (text.length > MAX_MESSAGE_CHARS) {
+    return json({ error: 'Сообщение слишком большое. Уменьшите файлы или их количество.' }, 400);
+  }
 
   const model = getModel(String(body.model || ''));
   if (!model) return json({ error: 'Неизвестная модель' }, 400);
@@ -40,7 +42,10 @@ export async function POST(req) {
       const own = await sql`SELECT id FROM chats WHERE id = ${chatId} AND user_id = ${user.id} LIMIT 1`;
       if (!own.length) return json({ error: 'Разговор не найден' }, 404);
     } else {
-      title = text.replace(/\s+/g, ' ').slice(0, 48) + (text.length > 48 ? '…' : '');
+      // Название берём из текста вопроса; если его нет, из имени первого файла
+      const { files, text: plain } = splitMessage(text);
+      const base = plain || (files[0] ? `Файл: ${files[0].name}` : text);
+      title = base.replace(/\s+/g, ' ').slice(0, 48) + (base.length > 48 ? '…' : '');
       const created = await sql`
         INSERT INTO chats (user_id, title, model) VALUES (${user.id}, ${title}, ${model.id})
         RETURNING id`;
@@ -53,7 +58,11 @@ export async function POST(req) {
       SELECT role, content FROM (
         SELECT id, role, content FROM messages WHERE chat_id = ${chatId} ORDER BY id DESC LIMIT ${HISTORY}
       ) t ORDER BY id ASC`;
-    const messages = hist.map((m) => ({ role: m.role, content: m.content }));
+    // Файлы из последнего сообщения передаём полностью, а из прошлых — только имена
+    const messages = hist.map((m, i) => ({
+      role: m.role,
+      content: i === hist.length - 1 ? m.content : compactAttachments(m.content),
+    }));
 
     let answer;
     try {
