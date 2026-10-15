@@ -6,9 +6,12 @@ import Brand from '@/components/Brand';
 import Markdown from '@/components/Markdown';
 import GithubImport from '@/components/GithubImport';
 import CustomizeModal from '@/components/CustomizeModal';
+import Scorpion from '@/components/Scorpion';
+import { ThinkingRow, ReasoningBlock } from '@/components/Thinking';
 import { MODELS, getModel, canUseModel } from '@/lib/models';
 import { buildMessage, splitMessage, readTextFile, validateAttachments } from '@/lib/attachments';
 import { DEFAULT_THEME, themeVars } from '@/lib/theme';
+import { splitReasoning } from '@/lib/reasoning';
 
 const SUGGESTIONS = [
   'Объясни простыми словами, что такое нейросеть',
@@ -80,6 +83,7 @@ export default function ChatApp({ user: initialUser }) {
   const [plusOpen, setPlusOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [reasoning, setReasoning] = useState(false);
   const [theme, setTheme] = useState(DEFAULT_THEME);
   const [savedTheme, setSavedTheme] = useState(DEFAULT_THEME);
   const [savedPrompt, setSavedPrompt] = useState('');
@@ -256,7 +260,7 @@ export default function ChatApp({ user: initialUser }) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId, model: modelId, message: content }),
+        body: JSON.stringify({ chatId, model: modelId, message: content, reasoning }),
       });
       const data = await res.json().catch(() => ({}));
 
@@ -410,6 +414,19 @@ export default function ChatApp({ user: initialUser }) {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className={reasoning ? 'reason-toggle on' : 'reason-toggle'}
+            aria-pressed={reasoning}
+            title="Darka сначала продумает ответ и покажет ход рассуждений"
+            onClick={() => setReasoning((r) => !r)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Рассуждение
+          </button>
           <span className="spacer" />
           <Link href="/" className="btn btn-sm" style={{ color: 'var(--muted)' }}>
             О Darka
@@ -437,10 +454,10 @@ export default function ChatApp({ user: initialUser }) {
               </div>
             )}
             {loadingChat && <div className="muted">Загружаю разговор…</div>}
-            {messages.map((m) =>
-              m.role === 'user' ? (
-                <UserMessage key={m.id} content={m.content} />
-              ) : (
+            {messages.map((m) => {
+              if (m.role === 'user') return <UserMessage key={m.id} content={m.content} />;
+              const parts = splitReasoning(m.content);
+              return (
                 <div key={m.id} className="msg-bot">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="av" src="/logo.png" alt="" />
@@ -448,32 +465,18 @@ export default function ChatApp({ user: initialUser }) {
                     <div className="who" style={{ color: getModel(m.model)?.color || 'var(--purple)' }}>
                       {getModel(m.model)?.name || 'Darka'}
                     </div>
-                    <Markdown text={m.content} />
+                    {parts.thinking && <ReasoningBlock thinking={parts.thinking} seconds={parts.seconds} />}
+                    <Markdown text={parts.answer} />
                     <div className="msg-tools">
-                      <button type="button" className="tool-btn" onClick={() => copy(m.id, m.content)}>
+                      <button type="button" className="tool-btn" onClick={() => copy(m.id, parts.answer)}>
                         {copied === m.id ? 'Скопировано' : 'Копировать'}
                       </button>
                     </div>
                   </div>
                 </div>
-              )
-            )}
-            {sending && (
-              <div className="msg-bot">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="av" src="/logo.png" alt="" />
-                <div className="body">
-                  <div className="who" style={{ color: model.color }}>
-                    {model.name}
-                  </div>
-                  <span className="typing" role="status" aria-label="Darka печатает">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                </div>
-              </div>
-            )}
+              );
+            })}
+            {sending && <ThinkingRow modelName={model.name} modelColor={model.color} reasoning={reasoning} />}
             <div ref={endRef} />
           </div>
         </div>
@@ -488,6 +491,10 @@ export default function ChatApp({ user: initialUser }) {
             )}
             {notice && !error && <div className="banner notice" role="status">{notice}</div>}
             <div className="composer-box">
+              {/* Скорпион сидит на краю поля ввода, а во время ответа уходит печатать за ноутбуком */}
+              <div className={sending ? 'perch away' : 'perch'} aria-hidden="true">
+                <Scorpion mode="sit" size={64} />
+              </div>
               <div className="plus-wrap" ref={plusRef}>
                 <button
                   type="button"

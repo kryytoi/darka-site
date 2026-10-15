@@ -3,6 +3,7 @@ import { requireUser, json, effectivePlan } from '@/lib/auth';
 import { getModel, canUseModel } from '@/lib/models';
 import { askModel, ModelError } from '@/lib/backends';
 import { MAX_MESSAGE_CHARS, splitMessage, compactAttachments } from '@/lib/attachments';
+import { REASONING_INSTRUCTION, parseReasoningAnswer, buildReasoningContent, answerOnly } from '@/lib/reasoning';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -27,6 +28,7 @@ export async function POST(req) {
     return json({ error: 'Сообщение слишком большое. Уменьшите файлы или их количество.' }, 400);
   }
 
+  const reasoning = body.reasoning === true;
   const model = getModel(String(body.model || ''));
   if (!model) return json({ error: 'Неизвестная модель' }, 400);
   if (!canUseModel(model, effectivePlan(user), user.role)) {
@@ -58,19 +60,20 @@ export async function POST(req) {
       SELECT role, content FROM (
         SELECT id, role, content FROM messages WHERE chat_id = ${chatId} ORDER BY id DESC LIMIT ${HISTORY}
       ) t ORDER BY id ASC`;
-    // Файлы из последнего сообщения передаём полностью, а из прошлых — только имена
+    // Файлы из последнего сообщения передаём полностью, а из прошлых — только имена.
+    // Рассуждения прошлых ответов модели не передаём: в истории остаётся только ответ.
     const messages = hist.map((m, i) => ({
       role: m.role,
-      content: i === hist.length - 1 ? m.content : compactAttachments(m.content),
+      content: m.role === 'assistant' ? answerOnly(m.content) : i === hist.length - 1 ? m.content : compactAttachments(m.content),
     }));
 
-    // Главный промпт пользователя: инструкция о том, как Darka должна писать
+    // Системная инструкция: главный промпт пользователя и, если включено, режим рассуждения
     const [settings] = await sql`SELECT system_prompt FROM user_settings WHERE user_id = ${user.id} LIMIT 1`;
-    const modelMessages = settings?.system_prompt
-      ? [{ role: 'system', content: settings.system_prompt }, ...messages]
-      : messages;
+    const system = [settings?.system_prompt, reasoning ? REASONING_INSTRUCTION : ''].filter(Boolean).join('\n\n');
+    const modelMessages = system ? [{ role: 'system', content: system }, ...messages] : messages;
 
     let answer;
+    const started = Date.now();
     try {
       answer = await askModel(model.id, modelMessages);
     } catch (e) {
@@ -79,15 +82,20 @@ export async function POST(req) {
       return json({ error: e.message, chatId, title }, status);
     }
 
+    // В режиме рассуждения отделяем ход мыслей от ответа и сохраняем их вместе
+    const seconds = Math.max(1, Math.round((Date.now() - started) / 1000));
+    const parsed = reasoning ? parseReasoningAnswer(answer) : { thinking: '', answer };
+    const stored = buildReasoningContent(parsed.thinking, seconds, parsed.answer);
+
     const saved = await sql`
-      INSERT INTO messages (chat_id, role, content, model) VALUES (${chatId}, 'assistant', ${answer}, ${model.id})
+      INSERT INTO messages (chat_id, role, content, model) VALUES (${chatId}, 'assistant', ${stored}, ${model.id})
       RETURNING id`;
     await sql`UPDATE chats SET updated_at = NOW(), model = ${model.id} WHERE id = ${chatId}`;
 
     return json({
       chatId,
       title,
-      message: { id: saved[0].id, role: 'assistant', content: answer, model: model.id },
+      message: { id: saved[0].id, role: 'assistant', content: stored, model: model.id },
     });
   } catch (e) {
     console.error(e);

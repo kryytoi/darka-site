@@ -99,6 +99,76 @@ function UserRow({ u, onAction, busy }) {
   );
 }
 
+// Один адрес для всех моделей. Какая модель нужна, сайт передаёт в теле запроса полем model.
+function ModelUrlCard({ say }) {
+  const [url, setUrl] = useState('');
+  const [saved, setSaved] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/settings', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        setUrl(data.modelUrl || '');
+        setSaved(data.modelUrl || '');
+      })
+      .catch(() => {
+        /* поле останется пустым */
+      })
+      .finally(() => setLoaded(true));
+  }, []);
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelUrl: url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка');
+      setUrl(data.modelUrl);
+      setSaved(data.modelUrl);
+      say('Адрес моделей сохранён');
+    } catch (err) {
+      say(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="model-card" onSubmit={save}>
+      <div>
+        <h2>Адрес моделей</h2>
+        <p className="muted">
+          Один адрес для всех четырёх моделей: Darka Shadow 1.0, Quiziw 7.0, 0.1 и 0.2 Enchanted. Сайт отправляет на него
+          POST-запрос, а в поле <code>model</code> указывает нужную модель. Этот адрес заменяет переменные окружения SHADOWURL,
+          QUIZIWURL, NOLDVA и NOLODIN.
+        </p>
+      </div>
+      <div className="model-row">
+        <input
+          className="input"
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://model.example.com/api/chat"
+          aria-label="Адрес моделей"
+          disabled={!loaded}
+        />
+        <button type="submit" className="btn btn-primary btn-sm" disabled={busy || !loaded || url.trim() === saved}>
+          {busy ? 'Сохраняю…' : 'Сохранить'}
+        </button>
+      </div>
+      {loaded && !saved && <p className="form-error">Адрес не задан, поэтому модели сейчас недоступны.</p>}
+    </form>
+  );
+}
+
 export default function AdminApp({ admin }) {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
@@ -178,6 +248,8 @@ export default function AdminApp({ admin }) {
       </div>
 
       <div className="wrap admin-body">
+        <ModelUrlCard say={say} />
+
         <h1>Пользователи</h1>
 
         {stats && (

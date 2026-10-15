@@ -338,6 +338,129 @@
 .send-btn:hover { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
 .banner.notice { color: var(--purple-soft); }
 
+/* Скорпион: цвета пикселей берутся из темы */
+.px-b { fill: var(--purple-btn); }
+.px-d { fill: var(--purple-deep); }
+.px-h { fill: var(--purple-soft); }
+.px-w { fill: #f472b6; }
+.px-e { fill: #ffffff; }
+.px-k { fill: #2a2145; }
+.px-g { fill: #8b7fc2; }
+.px-s { fill: var(--g-cyan); }
+
+.scorpion { display: block; flex: none; overflow: visible; }
+.scorpion.sit { animation: sc-bob 3.2s ease-in-out infinite; }
+.scorpion .sc-eye { animation: sc-blink 4.5s steps(1, end) infinite; }
+.scorpion .sc-screen { animation: sc-screen 1.1s steps(1, end) infinite; }
+.scorpion .sc-arm-a { animation: sc-arm-a 0.5s steps(1, end) infinite; }
+.scorpion .sc-arm-b { animation: sc-arm-b 0.5s steps(1, end) infinite; }
+.scorpion.type .sc-body { animation: sc-tap 0.5s steps(1, end) infinite; }
+
+@keyframes sc-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes sc-blink { 0%, 93%, 100% { opacity: 1; } 95%, 97% { opacity: 0; } }
+@keyframes sc-screen { 0% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes sc-arm-a { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes sc-arm-b { 0%, 49% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes sc-tap { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+
+/* Место скорпиона: сидит на верхнем краю поля ввода */
+.perch {
+  position: absolute;
+  bottom: 100%;
+  right: 48px;
+  margin-bottom: -1px;
+  z-index: 2;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.5s ease;
+}
+.perch.away {
+  opacity: 0;
+  transform: translateY(18px) scale(0.9);
+}
+
+/* Переключатель «Рассуждение» */
+.reason-toggle {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: rgba(21, 14, 38, 0.8);
+  color: var(--muted);
+  font-size: 14px;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.reason-toggle:hover { border-color: var(--purple); color: var(--purple-soft); }
+.reason-toggle.on {
+  border-color: var(--purple);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.2));
+  color: var(--text);
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.25);
+}
+.reason-toggle svg { flex: none; }
+.reason-toggle.on svg { color: var(--purple-soft); }
+
+/* Скорпион за ноутбуком во время ответа */
+.thinking-row .think-stage { width: 72px; flex: none; padding-top: 6px; }
+.think-text { color: var(--muted); font-size: 15px; }
+.think-sec { font-family: var(--mono); font-size: 12px; opacity: 0.8; }
+
+/* Блок рассуждений */
+.reasoning {
+  margin: 0 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(10, 6, 18, 0.5);
+}
+.reasoning summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+.reasoning summary::-webkit-details-marker { display: none; }
+.reasoning summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.2s;
+}
+.reasoning[open] summary::before { transform: rotate(90deg); }
+.reasoning-body {
+  padding: 4px 16px 14px;
+  border-top: 1px solid var(--line);
+  white-space: pre-wrap;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+/* Админка: адрес моделей */
+.model-card {
+  margin-bottom: 36px;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.model-card h2 {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 26px;
+}
+.model-card p { margin: 0 0 16px; line-height: 1.6; font-size: 15px; }
+.model-card code { font-family: var(--mono); font-size: 13px; color: var(--purple-soft); }
+.model-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.model-row .input { flex: 1 1 320px; }
+
 /* Окно импорта из GitHub */
 .modal-backdrop {
   position: fixed;
