@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 import { requireUser, json, effectivePlan } from '@/lib/auth';
 import { getModel, canUseModel } from '@/lib/models';
-import { askModel, ModelError } from '@/lib/backends';
+import { askModel, ModelError, normalizeMessages, MODEL_TIMEOUT_MS } from '@/lib/backends';
 import { MAX_MESSAGE_CHARS, splitMessage, compactAttachments } from '@/lib/attachments';
 import { REASONING_INSTRUCTION, parseReasoningAnswer, buildReasoningContent, answerOnly } from '@/lib/reasoning';
 
@@ -11,6 +11,7 @@ export const maxDuration = 60;
 const HISTORY = 20;
 
 export async function POST(req) {
+  const requestStarted = Date.now();
   // Без входа в аккаунт спрашивать Darka нельзя
   const { user, error } = await requireUser();
   if (error) return error;
@@ -62,24 +63,31 @@ export async function POST(req) {
       ) t ORDER BY id ASC`;
     // Файлы из последнего сообщения передаём полностью, а из прошлых — только имена.
     // Рассуждения прошлых ответов модели не передаём: в истории остаётся только ответ.
-    const messages = hist.map((m, i) => ({
-      role: m.role,
-      content: m.role === 'assistant' ? answerOnly(m.content) : i === hist.length - 1 ? m.content : compactAttachments(m.content),
-    }));
+    // Соседние реплики одной роли склеиваются, чтобы строгие шаблоны чата не падали (см. normalizeMessages).
+    const messages = normalizeMessages(
+      hist.map((m, i) => ({
+        role: m.role,
+        content: m.role === 'assistant' ? answerOnly(m.content) : i === hist.length - 1 ? m.content : compactAttachments(m.content),
+      }))
+    );
 
     // Системная инструкция: главный промпт пользователя и, если включено, режим рассуждения
     const [settings] = await sql`SELECT system_prompt FROM user_settings WHERE user_id = ${user.id} LIMIT 1`;
     const system = [settings?.system_prompt, reasoning ? REASONING_INSTRUCTION : ''].filter(Boolean).join('\n\n');
     const modelMessages = system ? [{ role: 'system', content: system }, ...messages] : messages;
 
+    // Модели достаётся время, которое осталось до лимита функции, чтобы ошибка успела дойти до пользователя
+    const timeoutMs = Math.max(10000, MODEL_TIMEOUT_MS - (Date.now() - requestStarted));
     let answer;
     const started = Date.now();
     try {
-      answer = await askModel(model.id, modelMessages);
+      answer = await askModel(model.id, modelMessages, { timeoutMs });
     } catch (e) {
       await sql`UPDATE chats SET updated_at = NOW() WHERE id = ${chatId}`;
       const status = e instanceof ModelError ? e.status : 502;
-      return json({ error: e.message, chatId, title }, status);
+      // Техническую причину видит только администратор: она нужна, чтобы починить сервер модели
+      const detail = user.role === 'admin' ? (e instanceof ModelError ? e.detail : String(e?.message || '')) : '';
+      return json({ error: e.message, ...(detail ? { detail } : {}), chatId, title }, status);
     }
 
     // В режиме рассуждения отделяем ход мыслей от ответа и сохраняем их вместе

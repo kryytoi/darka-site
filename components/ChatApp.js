@@ -271,7 +271,11 @@ export default function ChatApp({ user: initialUser }) {
       if (data.chatId && !chatId) setChatId(data.chatId);
 
       if (!res.ok) {
-        setError(data.error || 'Не удалось получить ответ');
+        // Если функция на Vercel оборвалась по таймауту, тела в JSON нет
+        const message =
+          data.error || (res.status === 504 ? 'Модель отвечает слишком долго. Попробуйте ещё раз.' : 'Не удалось получить ответ');
+        // detail приходит только администратору: это техническая причина ошибки
+        setError(data.detail ? `${message}\n${data.detail}` : message);
         if (data.chatId) loadChats();
         return;
       }

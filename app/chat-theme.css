@@ -337,6 +337,7 @@
 }
 .send-btn:hover { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
 .banner.notice { color: var(--purple-soft); }
+.banner { white-space: pre-line; overflow-wrap: anywhere; }
 
 /* Скорпион: цвета пикселей берутся из темы */
 .px-b { fill: var(--purple-btn); }
@@ -460,6 +461,21 @@
 .model-card code { font-family: var(--mono); font-size: 13px; color: var(--purple-soft); }
 .model-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .model-row .input { flex: 1 1 320px; }
+.model-card .model-note { margin: 12px 0 0; font-size: 14px; }
+.model-test {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--surface2);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.model-test strong { display: block; margin-bottom: 4px; }
+.model-test.ok { border-color: var(--purple); }
+.model-test.ok strong { color: var(--purple-soft); }
+.model-test.fail strong { color: var(--err); }
 
 /* Окно импорта из GitHub */
 .modal-backdrop {

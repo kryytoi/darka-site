@@ -105,6 +105,8 @@ function ModelUrlCard({ say }) {
   const [saved, setSaved] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [test, setTest] = useState(null);
 
   useEffect(() => {
     fetch('/api/admin/settings', { cache: 'no-store' })
@@ -140,6 +142,28 @@ function ModelUrlCard({ say }) {
     }
   }
 
+  // Отправляет тестовый вопрос на адрес из поля (даже несохранённый) и показывает, что ответил сервер
+  async function runTest() {
+    setTesting(true);
+    setTest(null);
+    try {
+      const res = await fetch('/api/admin/settings/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelUrl: url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Проверка не удалась (HTTP ${res.status})`);
+      setTest(data);
+    } catch (err) {
+      setTest({ ok: false, error: err.message });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const seconds = (ms) => (ms / 1000).toFixed(1).replace('.', ',');
+
   return (
     <form className="model-card" onSubmit={save}>
       <div>
@@ -155,16 +179,42 @@ function ModelUrlCard({ say }) {
           className="input"
           type="url"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setTest(null);
+          }}
           placeholder="https://model.example.com/api/chat"
           aria-label="Адрес моделей"
           disabled={!loaded}
         />
+        <button type="button" className="btn btn-ghost btn-sm" onClick={runTest} disabled={testing || !loaded || !url.trim()}>
+          {testing ? 'Проверяю…' : 'Проверить'}
+        </button>
         <button type="submit" className="btn btn-primary btn-sm" disabled={busy || !loaded || url.trim() === saved}>
           {busy ? 'Сохраняю…' : 'Сохранить'}
         </button>
       </div>
-      {loaded && !saved && <p className="form-error">Адрес не задан, поэтому модели сейчас недоступны.</p>}
+      {loaded && !saved && <p className="form-error model-note">Адрес не задан, поэтому модели сейчас недоступны.</p>}
+      {loaded && saved && url.trim() !== saved && (
+        <p className="muted model-note">Адрес изменён, но ещё не сохранён: чат пока ходит на старый.</p>
+      )}
+      {testing && <p className="muted model-note">Отправляю тестовый вопрос. Если модель в Colab генерирует медленно, это займёт до минуты.</p>}
+      {test && (
+        <div className={test.ok ? 'model-test ok' : 'model-test fail'} role="status">
+          {test.ok ? (
+            <>
+              <strong>Модель ответила за {seconds(test.ms)} с</strong>
+              <div className="muted">«{test.reply}»</div>
+            </>
+          ) : (
+            <>
+              <strong>{test.error}</strong>
+              {test.detail && <div>{test.detail}</div>}
+              {test.ms != null && <div className="muted">Прошло {seconds(test.ms)} с</div>}
+            </>
+          )}
+        </div>
+      )}
     </form>
   );
 }
